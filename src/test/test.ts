@@ -14,7 +14,7 @@ function execute(cmd: string): any {
   });
 }
 
-const basho = `node ${path.resolve("./dist/basho.js")}`;
+const basho = `node ${path.resolve("./dist/index.js")}`;
 
 describe("basho", () => {
   it(`Prints a number`, async () => {
@@ -109,6 +109,11 @@ describe("basho", () => {
   it(`Can accept a piped argument`, async () => {
     const output = await execute(`echo 10 | ${basho} -e 'echo \${x}'`);
     output.should.equal("10\n");
+  });
+
+  it(`Can accept a multi-line piped argument`, async () => {
+    const output = await execute(`printf "10\n20" | ${basho} -e 'echo \${x}'`);
+    output.should.equal("10\n20\n");
   });
 
   it(`Calls a subsequent expression for each array item`, async () => {

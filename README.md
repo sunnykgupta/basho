@@ -1,9 +1,19 @@
 # Basho: Shell Automation with Plain JavaScript
 
-Installation
+Basho lets you to write complex shell tasks using plain JavaScript without having to dabble with shell scripting.
+But when needed, basho lets you easily integrate shell commands as well.
+
+Install basho first.
 
 ```bash
 npm install -g basho
+```
+
+If you have npm > 5.2.0, you can use the npx command to try basho without installing.
+
+```bash
+# For example, Prints 100
+npx basho -j 100
 ```
 
 ### Basics
@@ -64,7 +74,7 @@ You can pipe an expression into a subsequent expression. The variable ‘x’ is
 always used as a placeholder for receiving the previous input.
 
 ```bash
-# Prints 10000
+# Prints 10100
 basho 100 -j x**2 -j x+100
 ```
 
@@ -109,8 +119,14 @@ basho can receive input via stdin. As always, ‘x’ represents the input.
 echo 10 | basho 'parseInt(x)**2'
 ```
 
-There’s nothing stopping you from using all the piping magic built into your
-shell.
+You can pipe multi-line output from other commands.
+
+```bash
+# Find all files and directories with the string 'git' in its name.
+ls -al | basho -f 'x.includes("git")'
+```
+
+There’s nothing stopping you from piping basho's output either.
 
 ```bash
 # Prints 100
@@ -243,7 +259,7 @@ basho [10,20,30,40] -j x+1 -n add1 -j x+2 -n add2 -c add1,add2
 
 ### Recursion
 
-The -g option allows you to recurse to a previous named expression. 
+The -g option allows you to recurse to a previous named expression.
 It takes two parameters; (1) an expression name and (2) a predicate which stops the recursion.
 
 Here's an expression that keeps recursing and adding 100 till it exceeds 1000.
@@ -253,7 +269,7 @@ Here's an expression that keeps recursing and adding 100 till it exceeds 1000.
 basho 25 -j x+100 -n add1 -g add1 'x<1000'
 ```
 
-Recursion is powerful. For instance, along with a promise that sleeps for a specified time, 
+Recursion is powerful. For instance, along with a promise that sleeps for a specified time,
 recursion can use used to periodically run a command. Usage is left to the reader as an exercise.
 
 ### Promises!
@@ -317,16 +333,34 @@ the -i import option.
 
 ## Real world examples
 
-Count the number of occurences of a word in a string or file.
+Count the number of occurences of a word in a line of text.
 
 ```bash
-echo '"hello world hello hello"' | basho '(x.match(/hello/g) || []).length'
+echo '"hello world hello hello"' | basho -j '(x.match(/hello/g) || []).length'
+```
+
+Recursively list all typescript files
+
+```bash
+find . | basho -f 'x.endsWith(".ts")'
+```
+
+Count the number of typescript files
+
+```bash
+find . | basho -f 'x.endsWith(".ts")' -a x.length
 ```
 
 Get the weather in bangalore
 
 ```bash
-echo '"Bangalore,in"' | basho 'fetch(`http://api.openweathermap.org/data/2.5/weather?q=${x}&appid=YOURAPIKEY&units=metric`)' -j 'x.json()' -j x.main.temp
+echo '"Bangalore,in"' | basho -i node-fetch fetch 'fetch(`http://api.openweathermap.org/data/2.5/weather?q=${x}&appid=YOURAPIKEY&units=metric`)' -j 'x.json()' -j x.main.temp
+```
+
+Who wrote Harry Potter and the Philosopher's Stone?
+
+```bash
+basho -i node-fetch fetch 'fetch("https://www.googleapis.com/books/v1/volumes?q=isbn:0747532699")' -j 'x.json()' -j 'x.items[0].volumeInfo.authors'
 ```
 
 Find all git hosted sub directories which might need a pull
@@ -337,22 +371,49 @@ basho -e 'ls -alt' \
  -f 'x.length>2' \
  -j 'x.slice(-1)[0]' \
  -f '![".", ".."].includes(x)' \
- -l x \
+ -n dirname \
  -e 'cd ${x} && git remote update && git status' \
- -f 'x.some(_ => /branch is behind/.test(_))'
+ -f 'x.some(_ => /branch is behind/.test(_))' \
+ -s dirname
+```
+
+Same thing using shell piping
+
+```bash
+ls -alt | basho 'x.split(/\s+/)' \
+ -f 'x.length>2' \
+ -j 'x.slice(-1)[0]' \
+ -f '![".", ".."].includes(x)' \
+ -n dirname \
+ -e 'cd ${x} && git remote update && git status' \
+ -f 'x.some(_ => /branch is behind/.test(_))' \
+ -s dirname
 ```
 
 Find all git hosted sub directories which need to be pushed to remote
 
 ```bash
-basho -e 'ls -alt' \
-  -j 'x.split(/\s+/)' \
+ls -alt | basho 'x.split(/\s+/)' \
   -f 'x.length>2' \
   -j 'x.slice(-1)[0]' \
   -f '![".", ".."].includes(x)' \
-  -l x \
+  -n dirname \
   -e 'cd ${x} && git status' \
-  -f '!x.some(_ => /nothing to commit/.test(_)) || !x.some(_ => /branch is up-to-date/.test(_))'
+  -f '!x.some(_ => /nothing to commit/.test(_)) && !x.some(_ => /branch is up-to-date/.test(_))' \
+  -s dirname
+```
+
+Check if basho version is at least 0.0.43
+
+```bash
+BASHO_VERSION=$(basho -v | basho 'x.split(".")' -j '(parseInt(x[0]) > 0 || parseInt(x[1]) > 0 || parseInt(x[2]) >= 43) && "OK"')
+
+if [[ $BASHO_VERSION == "OK" ]]
+then
+  echo "All good. Format the universe."
+else
+  echo "Install basho version 0.0.43 or higher."
+fi
 ```
 
 ## That's it
